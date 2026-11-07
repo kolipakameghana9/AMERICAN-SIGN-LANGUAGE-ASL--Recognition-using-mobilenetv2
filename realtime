@@ -1,0 +1,259 @@
+import cv2
+import tensorflow as tf
+import numpy as np
+
+print("Loading ASL model...")
+
+# =====================================
+# 1. LOAD TRAINED MODEL
+# =====================================
+
+model = tf.keras.models.load_model("asl_model.keras")
+
+print("Model loaded successfully!")
+
+
+# =====================================
+# 2. LOAD CLASS NAMES
+# =====================================
+
+with open("class_names.txt", "r") as file:
+    class_names = [line.strip() for line in file]
+
+print("Classes loaded:", class_names)
+
+
+# =====================================
+# 3. START CAMERA
+# =====================================
+
+camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+if not camera.isOpened():
+    print("ERROR: Camera could not be opened.")
+    exit()
+
+print()
+print("Camera started!")
+print("Put your hand inside the blue box.")
+print("Press Q to quit.")
+
+
+# =====================================
+# 4. REAL-TIME LOOP
+# =====================================
+
+while True:
+
+    # Read camera frame
+    ret, frame = camera.read()
+
+    if not ret:
+        print("Could not read camera.")
+        break
+
+    # Mirror camera
+    frame = cv2.flip(frame, 1)
+
+
+    # =====================================
+    # 5. CROP HAND AREA
+    # =====================================
+
+    cropped = frame[105:395, 105:495]
+
+
+    # =====================================
+    # 6. RESIZE IMAGE
+    # =====================================
+
+    resized = cv2.resize(
+        cropped,
+        (128, 128)
+    )
+
+
+    # =====================================
+    # 7. CONVERT BGR TO RGB
+    # =====================================
+
+    resized = cv2.cvtColor(
+        resized,
+        cv2.COLOR_BGR2RGB
+    )
+
+
+    # =====================================
+    # 8. CONVERT TO FLOAT
+    # =====================================
+
+    resized = resized.astype(
+        np.float32
+    )
+
+
+    # =====================================
+    # 9. ADD BATCH DIMENSION
+    # =====================================
+
+    resized = np.expand_dims(
+        resized,
+        axis=0
+    )
+
+
+    # =====================================
+    # 10. MAKE PREDICTION
+    # =====================================
+
+    predictions = model.predict(
+        resized,
+        verbose=0
+    )
+
+
+    # =====================================
+    # 11. SHOW TOP 3 PREDICTIONS
+    # =====================================
+
+    top_indices = np.argsort(
+        predictions[0]
+    )[-3:][::-1]
+
+    top_predictions = []
+
+    for i in top_indices:
+
+        letter = class_names[i]
+
+        confidence = (
+            predictions[0][i] * 100
+        )
+
+        top_predictions.append(
+            (letter, confidence)
+        )
+
+    print(
+        "Top predictions:",
+        [
+            (
+                letter,
+                f"{confidence:.2f}%"
+            )
+            for letter, confidence
+            in top_predictions
+        ]
+    )
+
+
+    # =====================================
+    # 12. GET BEST PREDICTION
+    # =====================================
+
+    predicted_index = np.argmax(
+        predictions[0]
+    )
+
+    predicted_letter = class_names[
+        predicted_index
+    ]
+
+
+    # =====================================
+    # 13. CALCULATE CONFIDENCE
+    # =====================================
+
+    confidence = (
+        predictions[0][predicted_index]
+        * 100
+    )
+
+
+    # =====================================
+    # 14. DRAW BLUE BOX
+    # =====================================
+
+    cv2.rectangle(
+        frame,
+        (105, 105),
+        (495, 395),
+        (255, 0, 0),
+        2
+    )
+
+
+    # =====================================
+    # 15. DISPLAY PREDICTED LETTER
+    # =====================================
+
+    cv2.putText(
+        frame,
+        f"Letter: {predicted_letter}",
+        (20, 50),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1.2,
+        (0, 255, 0),
+        3
+    )
+
+
+    # =====================================
+    # 16. DISPLAY CONFIDENCE
+    # =====================================
+
+    cv2.putText(
+        frame,
+        f"Confidence: {confidence:.2f}%",
+        (20, 90),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.8,
+        (0, 255, 0),
+        2
+    )
+
+
+    # =====================================
+    # 17. DISPLAY INSTRUCTIONS
+    # =====================================
+
+    cv2.putText(
+        frame,
+        "Place hand inside box | Q = Quit",
+        (20, 450),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (0, 255, 0),
+        2
+    )
+
+
+    # =====================================
+    # 18. SHOW CAMERA WINDOW
+    # =====================================
+
+    cv2.imshow(
+        "Real-Time ASL Recognition",
+        frame
+    )
+
+
+    # =====================================
+    # 19. CHECK KEYBOARD
+    # =====================================
+
+    key = cv2.waitKey(1) & 0xFF
+
+    if key == ord("q") or key == ord("Q"):
+        break
+
+
+# =====================================
+# 20. CLOSE CAMERA
+# =====================================
+
+camera.release()
+
+cv2.destroyAllWindows()
+
+print("Real-time recognition stopped.")

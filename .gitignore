@@ -1,0 +1,12 @@
+asl_env/
+dataset/
+processed_dataset/
+asl_split_dataset/
+
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+asl_model.keras
+phase1_best.keras
+phase2_best.keras
